@@ -171,11 +171,8 @@ jobs:
             exit 1
           fi
 
-          yaml_files="$(find public -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) | wc -l)"
-          echo "Generated YAML files: ${yaml_files}"
-
-          if [[ "${yaml_files}" -eq 0 ]]; then
-            echo "No subscription YAML was generated. Refusing to deploy." >&2
+          if [[ ! -f "public/clash.yaml" ]]; then
+            echo "public/clash.yaml does not exist." >&2
             exit 1
           fi
 
@@ -184,27 +181,63 @@ jobs:
           import yaml
 
           path = pathlib.Path("public/clash.yaml")
-
-          if not path.exists():
-              print(0)
-              raise SystemExit
-
           data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
           proxies = data.get("proxies") or []
           print(len(proxies))
           PY
           )"
 
-          echo "Generated proxy count: ${node_count}"
+          echo "Current proxy count: ${node_count}"
 
           if [[ "${node_count}" -eq 0 ]]; then
             echo "Subscription contains zero proxies. Refusing to deploy." >&2
             exit 1
           fi
 
+          previous_node_count="$(python - <<'PY'
+          import json
+          import urllib.request
+
+          url = "https://moqianbing.github.io/Free-Nodes/report.json"
+
+          try:
+              request = urllib.request.Request(
+                  url,
+                  headers={"User-Agent": "Free-Nodes-Health-Check/1.0"},
+              )
+              with urllib.request.urlopen(request, timeout=15) as response:
+                  data = json.load(response)
+
+              value = data.get("node_count", 0)
+              if isinstance(value, int):
+                  print(value)
+              else:
+                  print(0)
+          except Exception as exc:
+              print(f"Could not read previous report: {exc}")
+              print(0)
+          PY
+          )"
+
+          echo "Previous published proxy count: ${previous_node_count}"
+
+          if [[ "${previous_node_count}" -gt 0 ]]; then
+            minimum_allowed=$(( previous_node_count / 5 ))
+
+            if [[ "${node_count}" -lt "${minimum_allowed}" ]]; then
+              echo "Node count dropped too sharply." >&2
+              echo "Previous: ${previous_node_count}" >&2
+              echo "Current : ${node_count}" >&2
+              echo "Minimum: ${minimum_allowed}" >&2
+              echo "Refusing to deploy." >&2
+              exit 1
+            fi
+          else
+            echo "No previous report available; skipping drop comparison."
+          fi
+
           echo "Subscription verification passed."
      
-
       - name: Upload subscription output (attempt 1)
         id: upload_subscription_1
         continue-on-error: true
