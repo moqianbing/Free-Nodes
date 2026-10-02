@@ -237,6 +237,7 @@ jobs:
           fi
 
           echo "Subscription verification passed."
+
      
       - name: Upload subscription output (attempt 1)
         id: upload_subscription_1
