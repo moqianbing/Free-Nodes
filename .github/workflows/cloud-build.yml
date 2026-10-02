@@ -154,7 +154,7 @@ jobs:
           GEOIP_TEST_URLS: "https://www.cloudflare.com/cdn-cgi/trace,https://api.country.is/"
           GEOIP_WORKERS: "64"
           SPEED_TEST_ENABLED: "1"
-          SPEED_TEST_LIMIT: "300"
+          SPEED_TEST_LIMIT: "0"
           SPEED_TEST_BYTES: "1000000"
           SPEED_TIMEOUT_SECONDS: "8"
           BENCHMARK_WORKERS: "48"
