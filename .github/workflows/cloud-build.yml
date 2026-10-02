@@ -159,6 +159,51 @@ jobs:
           SPEED_TIMEOUT_SECONDS: "8"
           BENCHMARK_WORKERS: "48"
         run: subbench run --mihomo .bin/mihomo --output public --workdir .work
+        
+      - name: Verify subscription output
+        if: ${{ steps.build_subscriptions.outcome == 'success' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ ! -d "public" ]]; then
+            echo "public directory does not exist." >&2
+            exit 1
+          fi
+
+          yaml_files="$(find public -maxdepth 1 -type f \( -name "*.yaml" -o -name "*.yml" \) | wc -l)"
+          echo "Generated YAML files: ${yaml_files}"
+
+          if [[ "${yaml_files}" -eq 0 ]]; then
+            echo "No subscription YAML was generated. Refusing to deploy." >&2
+            exit 1
+          fi
+
+          node_count="$(python - <<'PY'
+          import pathlib
+          import yaml
+
+          path = pathlib.Path("public/clash.yaml")
+
+          if not path.exists():
+              print(0)
+              raise SystemExit
+
+          data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+          proxies = data.get("proxies") or []
+          print(len(proxies))
+          PY
+          )"
+
+          echo "Generated proxy count: ${node_count}"
+
+          if [[ "${node_count}" -eq 0 ]]; then
+            echo "Subscription contains zero proxies. Refusing to deploy." >&2
+            exit 1
+          fi
+
+          echo "Subscription verification passed."
+     
 
       - name: Upload subscription output (attempt 1)
         id: upload_subscription_1
